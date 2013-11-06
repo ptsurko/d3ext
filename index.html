@@ -3,83 +3,16 @@
 <html>
   <head>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
-    <link type="text/css" rel="stylesheet" href="http://mbostock.github.io/d3/talk/20111116/style.css"/>
-    <style type="text/css">
-
-svg {
-  font-size: 14px;
-}
-
-.foreground path {
-  fill: none;
-  stroke-opacity: .5;
-  stroke-width: 1.5px;
-}
-
-.foreground path.fade {
-  stroke: #000;
-  stroke-opacity: .05;
-}
-
-.legend {
-  font-size: 18px;
-  font-style: oblique;
-}
-
-.legend line {
-  stroke-width: 2px;
-}
-
-.setosa {
-  stroke: #800;
-}
-
-.versicolor {
-  stroke: #080;
-}
-
-.virginica {
-  stroke: #008;
-}
-
-.brush .extent {
-  fill-opacity: .3;
-  stroke: #fff;
-  shape-rendering: crispEdges;
-}
-
-.axis line, .axis path {
-  fill: none;
-  stroke: #000;
-  shape-rendering: crispEdges;
-}
-
-.axis text {
-  text-shadow: 0 1px 0 #fff;
-  cursor: move;
-}
-
-.multi-brush-extent-close {
-  width: 20px;
-  height: 20px;
-  background: red;
-}
-
-body {
-  margin: 0;
-}
-
-    </style>
+    <link type="text/css" rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/2.3.2/css/bootstrap.min.css"/>
+    <link type="text/css" rel="stylesheet" href="css/multibrush.css"/>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.3.9/d3.js"></script>
+    <script src="http://mbostock.github.io/d3/talk/20111116/d3/d3.csv.js"></script>
+    <script src="js/multibrush.js"></script>
   </head>
   <body>
-    <h2>
-      Edgar Anderson’s <i>Iris</i> data set<br>
-      parallel coordinates
-    </h2>
+    
     <div class="sample"></div>
-    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.3.9/d3.js"></script>
-    <script type="text/javascript" src="http://mbostock.github.io/d3/talk/20111116/d3/d3.csv.js"></script>
-    <script type="text/javascript" src="multibrush.js"></script>
+    
     <script type="text/javascript">
 
 var species = ["setosa", "versicolor", "virginica"],
@@ -196,7 +129,7 @@ function brush() {
   var actives = traits.filter(function(p) { return !y[p].brush.empty(); }),
       extents = actives.map(function(p) { return y[p].brush.extent(); });
       
-  foreground.classed("fade", function(d) {
+  foreground.classed("multibrush-fade", function(d) {
     return !actives.every(function(p, i) {
       var res = false;
       for(var j = 0; j < extents[i].length; j++) {

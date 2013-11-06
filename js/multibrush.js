@@ -1,7 +1,7 @@
 d3.svg.multiBrush = function() {
   //var event = d3.dispatch(brush, "brushstart", "brush", "brushend");
   var brushDispatcher = d3.dispatch(brush, "brushstart", "brush", "brushend");
-  var extentCloseClassName = "multi-brush-extent-close";
+  var extentCloseClassName = "icon-remove";
   var x = null, // x-scale, optional
       y = null, // y-scale, optional
       xExtent = [0, 0], // [x0, x1] in integer pixels
@@ -153,7 +153,7 @@ d3.svg.multiBrush = function() {
         resizingY = !/^(e|w)$/.test(resizing) && y,
         dragging = eventTarget.classed("extent"),
         newExtent = eventTarget.datum().brush !== null,
-        //dragRestore = d3_event_dragSuppress(),
+        dragRestore = d3_event_dragSuppress(),
         center,
         origin = d3.mouse(target),
         offset,
@@ -216,7 +216,7 @@ d3.svg.multiBrush = function() {
           yExtent: yExtent
       });
 
-      extentSelection = updateExtents(g, extents);
+      extentSelection = updateExtents(g, extents).addedSelection;
     }
 
     // // Propagate the active cursor to the body for the drag duration.
@@ -263,7 +263,10 @@ d3.svg.multiBrush = function() {
           .attr("height", 6)
           .style("visibility", "hidden");
 
-      return extentContainerSelection;
+      return {
+        addedSelection: addedExtentContainerSelection,
+        updatedSelection: extentContainerSelection
+      };
     }
 
     function keydown() {
@@ -310,7 +313,7 @@ d3.svg.multiBrush = function() {
                   if(allExtents[i] == extentToDelete) {
                     allExtents.splice(i, 1);
 
-                    var updatedExtentSelection = updateExtents(g, allExtents);
+                    var updatedExtentSelection = updateExtents(g, allExtents).updatedSelection;
 
                     //redrawExtentX(updatedExtentSelection);
                     redrawExtentY(updatedExtentSelection);
@@ -343,8 +346,8 @@ d3.svg.multiBrush = function() {
 
       var rect = where.getBoundingClientRect();
       extentCloseDiv.style.position = "absolute";
-      extentCloseDiv.style.left = rect.left + rect.width + "px";
-      extentCloseDiv.style.top = rect.top + "px";
+      extentCloseDiv.style.left = rect.left + rect.width + window.scrollX + "px";
+      extentCloseDiv.style.top = rect.top + window.scrollY + "px";
 
       document.body.appendChild(extentCloseDiv);
     }
@@ -439,7 +442,7 @@ d3.svg.multiBrush = function() {
 
     function brushend() {
       brushmove();
-      
+
       var currentExtent = extentSelection.datum();
       var extentToDelete = [], extentToMerge = [];
       var allExtents = g.selectAll(".extent-container").data();
@@ -457,7 +460,7 @@ d3.svg.multiBrush = function() {
           }
         }
 
-        var updatedExtentSelection = updateExtents(g, updatedExtents);
+        var updatedExtentSelection = updateExtents(g, updatedExtents).updatedSelection;
 
         //redrawExtentX(updatedExtentSelection);
         redrawExtentY(updatedExtentSelection);
@@ -476,7 +479,7 @@ d3.svg.multiBrush = function() {
         .on("keydown.brush", null)
         .on("keyup.brush", null);
 
-      //dragRestore();
+      dragRestore();
       brushDispatcher.brushend({type: "brushend"});
     }
   }
@@ -633,3 +636,31 @@ var d3_svg_brushResizes = [
   ["n", "s"],
   []
 ];
+
+
+var d3_event_dragId = 0;
+
+function d3_event_dragSuppress() {
+  function d3_eventPreventDefault() {
+    if(d3.event.preventDefault) {
+      d3.event.preventDefault();
+    }
+  }
+  var name = ".dragsuppress-" + d3_event_dragId++,
+      click = "click" + name,
+      w = d3.select(window)
+          .on("touchmove" + name, d3_eventPreventDefault)
+          .on("dragstart" + name, d3_eventPreventDefault)
+          .on("selectstart" + name, d3_eventPreventDefault);
+
+  return function(suppressClick) {
+    w.on(name, null);
+    if (suppressClick) { // suppress the next click, but only if it’s immediate
+      function off() { 
+        w.on(click, null);
+      }
+      w.on(click, function() { d3_eventPreventDefault(); off(); }, true);
+      setTimeout(off, 0);
+    }
+  };
+}
