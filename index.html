@@ -10,136 +10,198 @@
     <script src="js/multibrush.js"></script>
   </head>
   <body>
-    
-    <div class="sample"></div>
-    
+    <div class="multibrushXSample"></div>
+    <div class="multibrushYSample"></div>
+
     <script type="text/javascript">
+(function() {
+  var dataset = [];
 
-var species = ["setosa", "versicolor", "virginica"],
-    traits = ["sepal length", "petal length", "sepal width", "petal width"];
+  for(var i = 0; i < 500; i++) {
+    dataset.push([Math.floor((Math.random()*500)+1),Math.floor((Math.random()*500)+1)]);
+  }
 
-var m = [80, 160, 200, 160],
-    w = 1280 - m[1] - m[3],
-    h = 800 - m[0] - m[2];
+  var m = [50, 50, 50, 50],
+      w = 800 - m[1] - m[3],
+      h = 500 - m[0] - m[2];
 
-var x = d3.scale.ordinal().domain(traits).rangePoints([0, w]),
-    y = {};
+  var xScale = d3.scale.linear()
+      .domain([0, d3.max(dataset, function(d) {
+        return d[0];
+      })])
+      .range([0, w]),
+    yScale = d3.scale.linear()
+      .domain([0, d3.max(dataset, function(d) {
+        return d[1];
+      })])
+      .range([h, 0]);
+    yScale.brush = d3.svg.multiBrush()
+          .y(yScale)
+          .on("brush", brush);
 
-var line = d3.svg.line(),
-    axis = d3.svg.axis().orient("left"),
-    foreground;
+  var xAxis = d3.svg.axis()
+      .scale(xScale)
+      .orient("bottom"),
+      yAxis = d3.svg.axis()
+      .scale(yScale)
+      .orient("left");
 
-var svg = d3.select(".sample").append("svg:svg")
-    .attr("width", w + m[1] + m[3])
-    .attr("height", h + m[0] + m[2])
-  .append("svg:g")
-    .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
-
-d3.csv("iris.csv", function(flowers) {
-
-  // Create a scale and brush for each trait.
-  traits.forEach(function(d) {
-    // Coerce values to numbers.
-    flowers.forEach(function(p) { p[d] = +p[d]; });
-
-    y[d] = d3.scale.linear()
-        .domain(d3.extent(flowers, function(p) { return p[d]; }))
-        .range([h, 0]);
-
-    y[d].brush = d3.svg.multiBrush()
-        .y(y[d])
-        .on("brush", brush);
- });
-
-  // Add a legend.
-  var legend = svg.selectAll("g.legend")
-      .data(species)
-    .enter().append("svg:g")
-      .attr("class", "legend")
-      .attr("transform", function(d, i) { return "translate(0," + (i * 20 + 584) + ")"; });
-
-  legend.append("svg:line")
-      .attr("class", String)
-      .attr("x2", 8);
-
-  legend.append("svg:text")
-      .attr("x", 12)
-      .attr("dy", ".31em")
-      .text(function(d) { return "Iris " + d; });
-
-  // Add foreground lines.
-  foreground = svg.append("svg:g")
-      .attr("class", "foreground")
-    .selectAll("path")
-      .data(flowers)
-    .enter().append("svg:path")
-      .attr("d", path)
-      .attr("class", function(d) { return d.species; });
-
-  // Add a group element for each trait.
-  var g = svg.selectAll(".trait")
-      .data(traits)
-    .enter().append("svg:g")
-      .attr("class", "trait")
-      .attr("transform", function(d) { return "translate(" + x(d) + ")"; });
+  var svg = d3.select(".multibrushXSample").append("svg:svg")
+      .attr("width", w + m[1] + m[3])
+      .attr("height", h + m[0] + m[2])
+      .append("svg:g")
+        .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
 
   // Add an axis and title.
-  g.append("svg:g")
+  svg.append("svg:g")
       .attr("class", "axis")
-      .each(function(d) { d3.select(this).call(axis.scale(y[d])); })
-    .append("svg:text")
-      .attr("text-anchor", "middle")
-      .attr("y", -9)
-      .text(String);
+      .attr("transform", "translate(" + 0 + "," + h + ")")
+      .call(xAxis);
 
-  // Add a brush for each axis.
-  g.append("svg:g")
-      .attr("class", "brush")
-      .each(function(d) { d3.select(this).call(y[d].brush); })
-    .selectAll("rect")
-      .attr("x", -8)
-      .attr("width", 16);
+  svg.append("svg:g")
+      .attr("class", "axis")
+      .call(yAxis)
+      .append("svg:g")
+        .attr("class", "brush")
+        .call(yScale.brush)
+        .selectAll("rect")
+          .attr("x", -8)
+          .attr("width", 16);
 
-  function dragstart(d) {
-    i = traits.indexOf(d);
+  var foreground = svg.selectAll("circle")
+      .data(dataset)
+      .enter()
+      .append("circle")
+      .attr("cx", function(d) {
+        return xScale(d[0]);
+      })
+      .attr("cy", function(d) {
+        return yScale(d[1]);
+      })
+      .attr("r", 1);
+  function brush() {
+    var extents = yScale.brush.extent();
+        
+    foreground.classed("multibrush-dot-fade", function(d) {
+        var res = false;
+        for(var j = 0; j < extents.length; j++) {
+          res = res || extents[j][0] <= d[1] && d[1] <= extents[j][1];
+        }
+        return !res;
+      });
   }
+}());
+    </script>
 
-  function drag(d) {
-    x.range()[i] = d3.event.x;
-    traits.sort(function(a, b) { return x(a) - x(b); });
-    g.attr("transform", function(d) { return "translate(" + x(d) + ")"; });
-    foreground.attr("d", path);
-  }
+    <script type="text/javascript">
+(function() {
+  var species = ["setosa", "versicolor", "virginica"],
+      traits = ["sepal length", "petal length", "sepal width", "petal width"];
 
-  function dragend(d) {
-    x.domain(traits).rangePoints([0, w]);
-    var t = d3.transition().duration(500);
-    t.selectAll(".trait").attr("transform", function(d) { return "translate(" + x(d) + ")"; });
-    t.selectAll(".foreground path").attr("d", path);
-  }
-});
+  var m = [50, 50, 50, 50],
+      w = 800 - m[1] - m[3],
+      h = 500 - m[0] - m[2];
 
-// Returns the path for a given data point.
-function path(d) {
-  return line(traits.map(function(p) { return [x(p), y[p](d[p])]; }));
-}
+  var x = d3.scale.ordinal().domain(traits).rangePoints([0, w]),
+      y = {};
 
-// Handles a brush event, toggling the display of foreground lines.
-function brush() {
-  var actives = traits.filter(function(p) { return !y[p].brush.empty(); }),
-      extents = actives.map(function(p) { return y[p].brush.extent(); });
-      
-  foreground.classed("multibrush-fade", function(d) {
-    return !actives.every(function(p, i) {
-      var res = false;
-      for(var j = 0; j < extents[i].length; j++) {
-        res = res || extents[i][j][0] <= d[p] && d[p] <= extents[i][j][1];
-      }
-      return res;
+  var line = d3.svg.line(),
+      axis = d3.svg.axis().orient("left"),
+      foreground;
+
+  var svg = d3.select(".multibrushYSample").append("svg:svg")
+      .attr("width", w + m[1] + m[3])
+      .attr("height", h + m[0] + m[2])
+      .append("svg:g")
+        .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
+
+  d3.csv("iris.csv", function(flowers) {
+
+    // Create a scale and brush for each trait.
+    traits.forEach(function(d) {
+      // Coerce values to numbers.
+      flowers.forEach(function(p) { p[d] = +p[d]; });
+
+      y[d] = d3.scale.linear()
+          .domain(d3.extent(flowers, function(p) { return p[d]; }))
+          .range([h, 0]);
+
+      y[d].brush = d3.svg.multiBrush()
+          .y(y[d])
+          .on("brush", brush);
     });
-  });
-}
 
+    // Add a legend.
+    var legend = svg.selectAll("g.legend")
+        .data(species)
+      .enter().append("svg:g")
+        .attr("class", "legend")
+        .attr("transform", function(d, i) { return "translate(0," + (i * 20 + 584) + ")"; });
+
+    legend.append("svg:line")
+        .attr("class", String)
+        .attr("x2", 8);
+
+    legend.append("svg:text")
+        .attr("x", 12)
+        .attr("dy", ".31em")
+        .text(function(d) { return "Iris " + d; });
+
+    // Add foreground lines.
+    foreground = svg.append("svg:g")
+        .attr("class", "foreground")
+      .selectAll("path")
+        .data(flowers)
+      .enter().append("svg:path")
+        .attr("d", path)
+        .attr("class", function(d) { return d.species; });
+
+    // Add a group element for each trait.
+    var g = svg.selectAll(".trait")
+        .data(traits)
+      .enter().append("svg:g")
+        .attr("class", "trait")
+        .attr("transform", function(d) { return "translate(" + x(d) + ")"; });
+
+    // Add an axis and title.
+    g.append("svg:g")
+        .attr("class", "axis")
+        .each(function(d) { d3.select(this).call(axis.scale(y[d])); })
+      .append("svg:text")
+        .attr("text-anchor", "middle")
+        .attr("y", -9)
+        .text(String);
+
+    // Add a brush for each axis.
+    g.append("svg:g")
+        .attr("class", "brush")
+        .each(function(d) { d3.select(this).call(y[d].brush); })
+      .selectAll("rect")
+        .attr("x", -8)
+        .attr("width", 16);
+  });
+
+  // Returns the path for a given data point.
+  function path(d) {
+    return line(traits.map(function(p) { return [x(p), y[p](d[p])]; }));
+  }
+
+  // Handles a brush event, toggling the display of foreground lines.
+  function brush() {
+    var actives = traits.filter(function(p) { return !y[p].brush.empty(); }),
+        extents = actives.map(function(p) { return y[p].brush.extent(); });
+        
+    foreground.classed("multibrush-fade", function(d) {
+      return !actives.every(function(p, i) {
+        var res = false;
+        for(var j = 0; j < extents[i].length; j++) {
+          res = res || extents[i][j][0] <= d[p] && d[p] <= extents[i][j][1];
+        }
+        return res;
+      });
+    });
+  }
+}());
     </script>
   </body>
 </html>

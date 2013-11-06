@@ -1,7 +1,7 @@
 d3.svg.multiBrush = function() {
   //var event = d3.dispatch(brush, "brushstart", "brush", "brushend");
   var brushDispatcher = d3.dispatch(brush, "brushstart", "brush", "brushend");
-  var extentCloseClassName = "icon-remove";
+  var extentCloseClassName = "multi-brush-extent-close";
   var x = null, // x-scale, optional
       y = null, // y-scale, optional
       xExtent = [0, 0], // [x0, x1] in integer pixels
@@ -336,7 +336,7 @@ d3.svg.multiBrush = function() {
     function hideCloseButtonIfShown() {
       var extentCloseDiv = document.querySelector("." + extentCloseClassName);
       if(extentCloseDiv) {
-        extentCloseDiv.parentNode.removeChild(extentCloseDiv);
+        extentCloseDiv.remove();
       }
     }
 
@@ -346,8 +346,8 @@ d3.svg.multiBrush = function() {
 
       var rect = where.getBoundingClientRect();
       extentCloseDiv.style.position = "absolute";
-      extentCloseDiv.style.left = rect.left + rect.width + (window.scrollX || 0) + "px";
-      extentCloseDiv.style.top = rect.top + (window.scrollY || 0) + "px";
+      extentCloseDiv.style.left = rect.left + rect.width + "px";
+      extentCloseDiv.style.top = rect.top + "px";
 
       document.body.appendChild(extentCloseDiv);
     }

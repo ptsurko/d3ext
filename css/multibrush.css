@@ -2,6 +2,8 @@
 
 svg {
   font-size: 14px;
+  display: block;
+  margin: 0 auto;
 }
 
 .foreground path {
@@ -48,13 +50,11 @@ svg {
   shape-rendering: crispEdges;
 }
 
-.axis text {
-  text-shadow: 0 1px 0 #fff;
-  cursor: move;
+.icon-remove {
+  cursor: pointer;
 }
 
-.multi-brush-extent-close {
-  width: 20px;
-  height: 20px;
-  background: red;
+
+.multibrush-dot-fade {
+  opacity: .3;
 }
