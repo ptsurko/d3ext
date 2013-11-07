@@ -58,3 +58,14 @@ svg {
 .multibrush-dot-fade {
   opacity: .3;
 }
+
+.point {
+  fill: #999;
+  stroke: #fff;
+}
+
+.point.selected {
+  fill: red;
+  fill-opacity: 1;
+  stroke: brown;
+}
