@@ -4,8 +4,8 @@ d3.svg.multiBrush = function() {
   var extentCloseClassName = "icon-remove";
   var x = null, // x-scale, optional
       y = null, // y-scale, optional
-      xExtent = [0, 0], // [x0, x1] in integer pixels
-      yExtent = [0, 0], // [y0, y1] in integer pixels
+      //xExtent = [0, 0], // [x0, x1] in integer pixels
+      //yExtent = [0, 0], // [y0, y1] in integer pixels
       xClamp = true, // whether to clamp the x-extent to the range
       yClamp = true, // whether to clamp the y-extent to the range
       resizes = d3_svg_brushResizes[0],
@@ -14,7 +14,9 @@ d3.svg.multiBrush = function() {
       backgroundSelection,
       //TODO: consider getting these values from 'background' rect
       selectionWidth = 16,
-      resizerWidth = 6;
+      resizerWidth = 6,
+      initialExtents = [];
+
 
   function brush(g) {
     g.each(function() {
@@ -55,6 +57,16 @@ d3.svg.multiBrush = function() {
         range = d3_scaleRange(y);
         backgroundUpdate.attr("y", range[0]).attr("height", range[1] - range[0]);
         //redrawY(gUpdate);
+      }
+      
+      if(initialExtents.length) {
+        var addedExtentSelection = updateExtents(brushSelection, initialExtents).addedSelection;
+
+        redrawExtentX(addedExtentSelection);
+        redrawExtentY(addedExtentSelection);
+        redrawResizers(addedExtentSelection);
+
+        brushDispatcher.brush({type: "brush"});
       }
       //redraw(gUpdate);
     });
@@ -146,52 +158,7 @@ d3.svg.multiBrush = function() {
     
     brushmove();
 
-    function updateExtents(g, extents) {
-
-      var extentContainerSelection = g
-          .selectAll(".extent-container")
-          .data(extents, function(d) { return d.id; });
-
-      var addedExtentContainerSelection = extentContainerSelection.enter()
-          .append('svg:g')
-          .attr("class", "extent-container");
-
-      addedExtentContainerSelection.append('rect')
-          .style("cursor", "move")
-          .attr('class', 'extent')
-          .attr("x", function(d) { return y ? -(selectionWidth / 2) : null; })
-          .attr("y", function(d) { return x ? -(selectionWidth / 2) : null; })
-          .attr("width", function(d) { return y ? selectionWidth : null; })
-          .attr("height", function(d) { return x ? selectionWidth : null; })
-          .on('mouseover', mouseover)
-          .on('mouseout', mouseout);
-
-      extentContainerSelection
-          .exit().remove();
-
-      var resizeSelection = addedExtentContainerSelection.selectAll(".resize")
-          .data(resizes, function(d) { return d;});
-
-      resizeSelection.enter()
-          .append("rect")
-          .attr("class", function(d) { return "resize " + d; })
-          .style("cursor", function(d) { return d3_svg_brushCursor[d]; })
-          .attr("x", function(d) { return /[ew]$/.test(d) ? -(resizerWidth / 2) : -(selectionWidth / 2); })
-          .attr("y", function(d) { return /^[ns]/.test(d) ? -(resizerWidth / 2) : -(selectionWidth / 2); })
-          .attr("width", function(d) { return /[ew]$/.test(d) ? resizerWidth : selectionWidth; })
-          .attr("height", function(d) { return /^[ns]/.test(d) ? resizerWidth : selectionWidth; })
-
-          // .attr("x", function(d) { return /[ew]$/.test(d) ? -3 : null; })
-          // .attr("y", function(d) { return /^[ns]/.test(d) ? -3 : null; })
-          // .attr("width", 6)
-          // .attr("height", 6)
-          .style("visibility", "hidden");
-
-      return {
-        addedSelection: addedExtentContainerSelection,
-        updatedSelection: extentContainerSelection
-      };
-    }
+    
 
     function keydown() {
       if (d3.event.keyCode == 32) {
@@ -214,72 +181,7 @@ d3.svg.multiBrush = function() {
       }
     }
 
-    function mouseover() {
-      hideCloseButtonIfShown();
-
-      showCloseButton(this);
-    }
-
-    function mouseout() {
-      var target = d3.select(this);
-      var relTarg = d3.event.relatedTarget || d3.event.toElement;
-
-      if(relTarg.className.indexOf && relTarg.className.indexOf(extentCloseClassName) >= 0) {
-        d3.select(relTarg)
-            .on('mouseout', function() {
-              hideCloseButtonIfShown();
-            })
-            .on('click', function() {
-              var allExtents = g.selectAll(".extent-container").data();
-              var extentToDelete = target.datum();
-              if (allExtents) {
-                for(var i = 0; i < allExtents.length; i++) {
-                  if(allExtents[i] == extentToDelete) {
-                    allExtents.splice(i, 1);
-
-                    var updatedExtentSelection = updateExtents(g, allExtents).updatedSelection;
-
-                    redrawExtentX(updatedExtentSelection);
-                    redrawExtentY(updatedExtentSelection);
-                    redrawResizers(updatedExtentSelection);
-
-                    brushDispatcher.brush({type: "brush"});
-                    break;
-                  }
-                }
-              }
-
-              hideCloseButtonIfShown();
-            });
-      } else {
-        hideCloseButtonIfShown();
-      }
-    }
-
-    function hideCloseButtonIfShown() {
-      var extentCloseDiv = document.querySelector("." + extentCloseClassName);
-      if(extentCloseDiv) {
-        extentCloseDiv.parentNode.removeChild(extentCloseDiv);
-      }
-    }
-
-    function showCloseButton(where) {
-      var extentCloseDiv = document.createElement('div');
-      extentCloseDiv.className = extentCloseClassName;
-
-      var rect = where.getBoundingClientRect();
-      extentCloseDiv.style.position = "absolute";
-      extentCloseDiv.style.zIndex = 100;
-      if (y) {
-        extentCloseDiv.style.left = rect.left + rect.width + (window.scrollX || 0) - 1 + "px";
-        extentCloseDiv.style.top = rect.top + (window.scrollY || 0) + "px";
-      } else if (x) {
-        extentCloseDiv.style.right = document.body.clientWidth - (rect.left + rect.width + (window.scrollX || 0)) + "px";
-        extentCloseDiv.style.top = rect.top + rect.height + (window.scrollY || 0) + "px";
-      }
-
-      document.body.appendChild(extentCloseDiv);
-    }
+    
 
     function brushmove() {
       var point = d3.mouse(target),
@@ -425,6 +327,120 @@ d3.svg.multiBrush = function() {
     }
   }
 
+  function updateExtents(g, extents) {
+
+      var extentContainerSelection = g
+          .selectAll(".extent-container")
+          .data(extents, function(d) { return d.id; });
+
+      var addedExtentContainerSelection = extentContainerSelection.enter()
+          .append('svg:g')
+          .attr("class", "extent-container");
+
+      addedExtentContainerSelection.append('rect')
+          .style("cursor", "move")
+          .attr('class', 'extent')
+          .attr("x", function(d) { return y ? -(selectionWidth / 2) : null; })
+          .attr("y", function(d) { return x ? -(selectionWidth / 2) : null; })
+          .attr("width", function(d) { return y ? selectionWidth : null; })
+          .attr("height", function(d) { return x ? selectionWidth : null; })
+          .on('mouseover', mouseover)
+          .on('mouseout', mouseout);
+
+      extentContainerSelection
+          .exit().remove();
+
+      var resizeSelection = addedExtentContainerSelection.selectAll(".resize")
+          .data(resizes, function(d) { return d;});
+
+      resizeSelection.enter()
+          .append("rect")
+          .attr("class", function(d) { return "resize " + d; })
+          .style("cursor", function(d) { return d3_svg_brushCursor[d]; })
+          .attr("x", function(d) { return /[ew]$/.test(d) ? -(resizerWidth / 2) : -(selectionWidth / 2); })
+          .attr("y", function(d) { return /^[ns]/.test(d) ? -(resizerWidth / 2) : -(selectionWidth / 2); })
+          .attr("width", function(d) { return /[ew]$/.test(d) ? resizerWidth : selectionWidth; })
+          .attr("height", function(d) { return /^[ns]/.test(d) ? resizerWidth : selectionWidth; })
+
+          // .attr("x", function(d) { return /[ew]$/.test(d) ? -3 : null; })
+          // .attr("y", function(d) { return /^[ns]/.test(d) ? -3 : null; })
+          // .attr("width", 6)
+          // .attr("height", 6)
+          .style("visibility", "hidden");
+
+      return {
+        addedSelection: addedExtentContainerSelection,
+        updatedSelection: extentContainerSelection
+      };
+  }
+
+  function mouseover() {
+    hideCloseButtonIfShown();
+
+    showCloseButton(this);
+  }
+
+  function mouseout() {
+    var target = d3.select(this);
+    var relTarg = d3.event.relatedTarget || d3.event.toElement;
+
+    if(relTarg.className.indexOf && relTarg.className.indexOf(extentCloseClassName) >= 0) {
+      d3.select(relTarg)
+          .on('mouseout', function() {
+            hideCloseButtonIfShown();
+          })
+          .on('click', function() {
+            var allExtents = brushSelection.selectAll(".extent-container").data();
+            var extentToDelete = target.datum();
+            if (allExtents) {
+              for(var i = 0; i < allExtents.length; i++) {
+                if(allExtents[i] == extentToDelete) {
+                  allExtents.splice(i, 1);
+
+                  var updatedExtentSelection = updateExtents(brushSelection, allExtents).updatedSelection;
+
+                  redrawExtentX(updatedExtentSelection);
+                  redrawExtentY(updatedExtentSelection);
+                  redrawResizers(updatedExtentSelection);
+
+                  brushDispatcher.brush({type: "brush"});
+                  break;
+                }
+              }
+            }
+
+            hideCloseButtonIfShown();
+          });
+    } else {
+      hideCloseButtonIfShown();
+    }
+  }
+
+  function hideCloseButtonIfShown() {
+    var extentCloseDiv = document.querySelector("." + extentCloseClassName);
+    if(extentCloseDiv) {
+      extentCloseDiv.parentNode.removeChild(extentCloseDiv);
+    }
+  }
+
+  function showCloseButton(where) {
+    var extentCloseDiv = document.createElement('div');
+    extentCloseDiv.className = extentCloseClassName;
+
+    var rect = where.getBoundingClientRect();
+    extentCloseDiv.style.position = "absolute";
+    extentCloseDiv.style.zIndex = 100;
+    if (y) {
+      extentCloseDiv.style.left = rect.left + rect.width + (window.scrollX || 0) - 1 + "px";
+      extentCloseDiv.style.top = rect.top + (window.scrollY || 0) + "px";
+    } else if (x) {
+      extentCloseDiv.style.right = document.body.clientWidth - (rect.left + rect.width + (window.scrollX || 0)) + "px";
+      extentCloseDiv.style.top = rect.top + rect.height + (window.scrollY || 0) + "px";
+    }
+
+    document.body.appendChild(extentCloseDiv);
+  }
+
   function containExtent(extent1, extent2) {
     return extent1.yExtent[0] <= extent2.yExtent[0] &&
            extent1.yExtent[1] >= extent2.yExtent[1] &&
@@ -503,32 +519,55 @@ d3.svg.multiBrush = function() {
     return brush;
   };
 
-  brush.extent = function(z) {
+  brush.extent = function(data) {
     var x0, x1, y0, y1, t;
-    var result = [];
-    brushSelection.selectAll(".extent")
-        .each(function(d) {
-          if(x && y) {
-            y0 = y.invert(d.yExtent[0]);
-            y1 = y.invert(d.yExtent[1]);
-            x0 = x.invert(d.xExtent[0]);
-            x1 = x.invert(d.xExtent[1]);
+    if(!arguments.length) {
+      var result = [];
+      brushSelection.selectAll(".extent")
+          .each(function(d) {
+            if(x && y) {
+              y0 = y.invert(d.yExtent[0]);
+              y1 = y.invert(d.yExtent[1]);
+              x0 = x.invert(d.xExtent[0]);
+              x1 = x.invert(d.xExtent[1]);
 
-            result.push([[Math.min(x0, x1), Math.min(y0, y1)],[Math.max(x0, x1), Math.max(y0, y1)]]);
+              result.push([[Math.min(x0, x1), Math.min(y0, y1)],[Math.max(x0, x1), Math.max(y0, y1)]]);
 
-          } else if(y) {
-            y0 = y.invert(d.yExtent[0]);
-            y1 = y.invert(d.yExtent[1]);
-            
-            result.push([Math.min(y0, y1), Math.max(y0, y1)]);
-          } else if(x) {
-            x0 = x.invert(d.xExtent[0]);
-            x1 = x.invert(d.xExtent[1]);
-            
-            result.push([Math.min(x0, x1), Math.max(x0, x1)]);
-          }
-        });
-    return result;
+            } else if(y) {
+              y0 = y.invert(d.yExtent[0]);
+              y1 = y.invert(d.yExtent[1]);
+              
+              result.push([Math.min(y0, y1), Math.max(y0, y1)]);
+            } else if(x) {
+              x0 = x.invert(d.xExtent[0]);
+              x1 = x.invert(d.xExtent[1]);
+              
+              result.push([Math.min(x0, x1), Math.max(x0, x1)]);
+            }
+          });
+      return result;
+    } else {
+      data.forEach(function(d) {
+        if(x && y) {
+          x0 = x(d[0][0]);
+          y0 = y(d[0][1]);
+          x1 = x(d[1][0]);
+          y1 = y(d[1][1]);
+          initialExtents.push({xExtent:[x0, x1], yExtent:[y0,y1], id: extentIndex++});
+        } else if(y) {
+          y0 = y(d[0]);
+          y1 = y(d[1]);
+              
+          initialExtents.push({yExtent: [Math.min(y0, y1), Math.max(y0, y1)], xExtent: [0,0], id: extentIndex++});
+        } else if(x) {
+          x0 = x(d[0]);
+          x1 = x(d[1]);
+              
+          initialExtents.push({xExtent: [Math.min(x0, x1), Math.max(x0, x1)], yExtent: [0,0], id: extentIndex++});
+        }
+      });
+      return brush;    
+    }
     // Invert the pixel extent to data-space.
     // if (!arguments.length) {
     //   if (x) {

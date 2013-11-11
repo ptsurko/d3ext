@@ -31,7 +31,7 @@ var x = d3.scale.identity().domain([0, width]),
 var brush = d3.svg.multiBrush()
     .x(x)
     .y(y)
-    //.extent(defaultExtent) //TODO: TBD
+    .extent([[[100,100], [300,300]]])
     .on("brush", brushed);
 
 var svg = d3.select(".multibrushXYSample").append("svg")
@@ -95,6 +95,7 @@ function search(quadtree, x0, y0, x3, y3) {
       .range([h, 0]);
     xScale.brush = d3.svg.multiBrush()
           .x(xScale)
+          .extent([[50, 200], [300, 500]])
           .on("brush", brush);
 
   var xAxis = d3.svg.axis()
@@ -109,6 +110,18 @@ function search(quadtree, x0, y0, x3, y3) {
       .attr("height", h + m[0] + m[2])
       .append("svg:g")
         .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
+
+  var foreground = svg.selectAll("circle")
+      .data(dataset)
+      .enter()
+      .append("circle")
+      .attr("cx", function(d) {
+        return xScale(d[0]);
+      })
+      .attr("cy", function(d) {
+        return yScale(d[1]);
+      })
+      .attr("r", 2);
 
   // Add an axis and title.
   svg.append("svg:g")
@@ -125,19 +138,7 @@ function search(quadtree, x0, y0, x3, y3) {
   svg.append("svg:g")
       .attr("class", "axis")
       .call(yAxis);
-      
 
-  var foreground = svg.selectAll("circle")
-      .data(dataset)
-      .enter()
-      .append("circle")
-      .attr("cx", function(d) {
-        return xScale(d[0]);
-      })
-      .attr("cy", function(d) {
-        return yScale(d[1]);
-      })
-      .attr("r", 2);
   function brush() {
     var extents = xScale.brush.extent();
         
