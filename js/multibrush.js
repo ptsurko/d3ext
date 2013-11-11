@@ -158,6 +158,8 @@ d3.svg.multiBrush = function() {
     
     brushmove();
 
+    hideCloseButtonIfShown();
+
     
 
     function keydown() {
@@ -329,52 +331,51 @@ d3.svg.multiBrush = function() {
 
   function updateExtents(g, extents) {
 
-      var extentContainerSelection = g
-          .selectAll(".extent-container")
-          .data(extents, function(d) { return d.id; });
+    var extentContainerSelection = g
+        .selectAll(".extent-container")
+        .data(extents, function(d) { return d.id; });
 
-      var addedExtentContainerSelection = extentContainerSelection.enter()
-          .append('svg:g')
-          .attr("class", "extent-container");
+    var addedExtentContainerSelection = extentContainerSelection.enter()
+        .append('svg:g')
+        .attr("class", "extent-container");
 
-      addedExtentContainerSelection.append('rect')
-          .style("cursor", "move")
-          .attr('class', 'extent')
-          .attr("x", function(d) { return y ? -(selectionWidth / 2) : null; })
-          .attr("y", function(d) { return x ? -(selectionWidth / 2) : null; })
-          .attr("width", function(d) { return y ? selectionWidth : null; })
-          .attr("height", function(d) { return x ? selectionWidth : null; })
-          .on('mouseover', mouseover)
-          .on('mouseout', mouseout);
+    addedExtentContainerSelection.append('rect')
+        .style("cursor", "move")
+        .attr('class', 'extent')
+        .attr("x", function(d) { return y ? -(selectionWidth / 2) : null; })
+        .attr("y", function(d) { return x ? -(selectionWidth / 2) : null; })
+        .attr("width", function(d) { return y ? selectionWidth : null; })
+        .attr("height", function(d) { return x ? selectionWidth : null; })
+        .on('mouseover', mouseover)
+        .on('mouseout', mouseout);
 
-      extentContainerSelection
-          .exit().remove();
+    extentContainerSelection
+        .exit().remove();
 
-      var resizeSelection = addedExtentContainerSelection.selectAll(".resize")
-          .data(resizes, function(d) { return d;});
+    var resizeSelection = addedExtentContainerSelection.selectAll(".resize")
+        .data(resizes, function(d) { return d;});
 
-      resizeSelection.enter()
-          .append("rect")
-          .attr("class", function(d) { return "resize " + d; })
-          .style("cursor", function(d) { return d3_svg_brushCursor[d]; })
-          .attr("x", function(d) { return /[ew]$/.test(d) ? -(resizerWidth / 2) : -(selectionWidth / 2); })
-          .attr("y", function(d) { return /^[ns]/.test(d) ? -(resizerWidth / 2) : -(selectionWidth / 2); })
-          .attr("width", function(d) { return /[ew]$/.test(d) ? resizerWidth : selectionWidth; })
-          .attr("height", function(d) { return /^[ns]/.test(d) ? resizerWidth : selectionWidth; })
+    resizeSelection.enter()
+        .append("rect")
+        .attr("class", function(d) { return "resize " + d; })
+        .style("cursor", function(d) { return d3_svg_brushCursor[d]; })
+        .attr("x", function(d) { return /[ew]$/.test(d) ? -(resizerWidth / 2) : -(selectionWidth / 2); })
+        .attr("y", function(d) { return /^[ns]/.test(d) ? -(resizerWidth / 2) : -(selectionWidth / 2); })
+        .attr("width", function(d) { return /[ew]$/.test(d) ? resizerWidth : selectionWidth; })
+        .attr("height", function(d) { return /^[ns]/.test(d) ? resizerWidth : selectionWidth; })
+        .style("visibility", "hidden");
 
-          // .attr("x", function(d) { return /[ew]$/.test(d) ? -3 : null; })
-          // .attr("y", function(d) { return /^[ns]/.test(d) ? -3 : null; })
-          // .attr("width", 6)
-          // .attr("height", 6)
-          .style("visibility", "hidden");
-
-      return {
-        addedSelection: addedExtentContainerSelection,
-        updatedSelection: extentContainerSelection
-      };
+    return {
+      addedSelection: addedExtentContainerSelection,
+      updatedSelection: extentContainerSelection
+    };
   }
 
+  var closeButtonTimeout = null, closeButtonExtent;
   function mouseover() {
+    if(closeButtonTimeout) {
+      window.clearTimeout(closeButtonTimeout);
+    }
     hideCloseButtonIfShown();
 
     showCloseButton(this);
@@ -382,38 +383,8 @@ d3.svg.multiBrush = function() {
 
   function mouseout() {
     var target = d3.select(this);
-    var relTarg = d3.event.relatedTarget || d3.event.toElement;
-
-    if(relTarg.className.indexOf && relTarg.className.indexOf(extentCloseClassName) >= 0) {
-      d3.select(relTarg)
-          .on('mouseout', function() {
-            hideCloseButtonIfShown();
-          })
-          .on('click', function() {
-            var allExtents = brushSelection.selectAll(".extent-container").data();
-            var extentToDelete = target.datum();
-            if (allExtents) {
-              for(var i = 0; i < allExtents.length; i++) {
-                if(allExtents[i] == extentToDelete) {
-                  allExtents.splice(i, 1);
-
-                  var updatedExtentSelection = updateExtents(brushSelection, allExtents).updatedSelection;
-
-                  redrawExtentX(updatedExtentSelection);
-                  redrawExtentY(updatedExtentSelection);
-                  redrawResizers(updatedExtentSelection);
-
-                  brushDispatcher.brush({type: "brush"});
-                  break;
-                }
-              }
-            }
-
-            hideCloseButtonIfShown();
-          });
-    } else {
-      hideCloseButtonIfShown();
-    }
+    closeButtonExtent = target.datum();
+    closeButtonTimeout = window.setTimeout(hideCloseButtonIfShown, 500);
   }
 
   function hideCloseButtonIfShown() {
@@ -421,6 +392,7 @@ d3.svg.multiBrush = function() {
     if(extentCloseDiv) {
       extentCloseDiv.parentNode.removeChild(extentCloseDiv);
     }
+    closeButtonExtent = null;
   }
 
   function showCloseButton(where) {
@@ -439,6 +411,38 @@ d3.svg.multiBrush = function() {
     }
 
     document.body.appendChild(extentCloseDiv);
+    d3.select(extentCloseDiv)
+        .on('click', function() {
+          var allExtents = brushSelection.selectAll(".extent-container").data();
+          var extentToDelete = closeButtonExtent;
+          if (allExtents) {
+            for(var i = 0; i < allExtents.length; i++) {
+              if(allExtents[i] == extentToDelete) {
+                allExtents.splice(i, 1);
+
+                var updatedExtentSelection = updateExtents(brushSelection, allExtents).updatedSelection;
+
+                redrawExtentX(updatedExtentSelection);
+                redrawExtentY(updatedExtentSelection);
+                redrawResizers(updatedExtentSelection);
+
+                brushDispatcher.brush({type: "brush"});
+                break;
+              }
+            }
+          }
+
+          hideCloseButtonIfShown();
+        })
+      .on('mouseout', function() {
+        closeButtonTimeout = window.setTimeout(hideCloseButtonIfShown, 500);
+        //hideCloseButtonIfShown();
+      })
+      .on('mouseover', function() {
+        if(closeButtonTimeout) {
+          window.clearTimeout(closeButtonTimeout);
+        }
+      });
   }
 
   function containExtent(extent1, extent2) {
