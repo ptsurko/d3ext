@@ -1,0 +1,228 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+    <link type="text/css" rel="stylesheet" href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css"/>
+    <link type="text/css" rel="stylesheet" href="css/jqtree.css"/>
+    <link type="text/css" rel="stylesheet" href="css/zoomable.circles.css"/>
+  </head>
+  <body>
+    <h2>
+      Flare code size<br>
+      circle packing
+    </h2>
+  
+    <div class="container">
+      <div class="row">
+        <div class="span2">
+          <div id="tree1"></div>
+        </div>
+        <div class="span10">
+          <div id="circlepack"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.3.9/d3.js"></script>
+    <script src="http://codeorigin.jquery.com/jquery-1.10.2.min.js"></script>
+    <script src="/js/tree.jquery.js"></script>
+    <script type="text/javascript">
+
+var w = 740,
+    h = 740,
+    r = 720,
+    x = d3.scale.linear().range([0, r]),
+    y = d3.scale.linear().range([0, r]),
+    node,
+    root,
+    layers = 3;
+
+var pack = d3.layout.pack()
+    .size([r, r])
+    .value(function(d) { return d.size; })
+
+var vis = d3.select("#circlepack").insert("svg:svg", "h2")
+    .attr("width", w)
+    .attr("height", h)
+  .append("svg:g")
+    .attr("transform", "translate(" + (w - r) / 2 + "," + (h - r) / 2 + ")");
+
+d3.json("flare.json", function(data) {
+
+  $('#tree1').tree({
+    data: [data]
+  });
+  node = root = prepareData(data);
+  showNextLayer(root, pack, 0, 0);
+});
+
+function showNextLayer(currentLayer, pack, offsetX, offsetY) {
+  showNextLayers(currentLayer, 1);
+
+  var nodes;
+  if(currentLayer.$$layer != 0) {
+    nodes = packFromExistingLayer(currentLayer, pack, offsetX, offsetY);
+  } else {
+    nodes = pack.nodes(currentLayer);
+  }
+
+  vis.selectAll("circle")
+      .data(nodes, function(d) { return d.$$uniqueId; })
+    .enter().append("svg:circle")
+      .attr("class", function(d) { return d.hasChildren ? "parent" : "child"; })
+      .attr("cx", function(d) { return d.x; })
+      .attr("cy", function(d) { return d.y; })
+      .attr("r", function(d) { return d.r; })
+      .on("click", function(d) {
+        if(!d.hasChildren) {
+          d3.event.stopPropagation();
+        } else {
+          return zoom(node == d ? root : d);
+        }
+      });
+
+  vis.selectAll("text")
+      .data(nodes, function(d) { return d.$$uniqueId; })
+    .enter().append("svg:text")
+      .attr("class", function(d) { return d.hasChildren ? "parent" : "child"; })
+      .attr("x", function(d) { return d.x; })
+      .attr("y", function(d) { return d.y; })
+      .attr("dy", ".35em")
+      .attr("text-anchor", "middle")
+      .style("opacity", function(d) { return d.r > 20 ? 1 : 0; })
+      .text(function(d) { return d.label; });
+
+  d3.select(window).on("click", function() { zoom(root); });
+}
+
+function packFromExistingLayer(currentLayer, pack, offsetX, offsetY) {
+  var x = currentLayer.x,
+      y = currentLayer.y,
+      r = currentLayer.r;
+
+  var nodes = pack.nodes(currentLayer);
+
+  nodes[0].x = x;
+  nodes[0].y = y;
+  nodes[0].r = r;
+
+  nodes.shift();
+
+  for(var i = 0; i < nodes.length; i++) {
+    nodes[i].x += offsetX;
+    nodes[i].y += offsetY;
+  }
+
+  return nodes;
+}
+
+function zoom(d, i) {
+  var pack = d3.layout.pack()
+    .size([d.r * 2, d.r * 2])
+    .value(function(d) { return d.size; })
+
+  var dataToDelete = hideAllBelow(root, d.$$layer + 1);
+
+  showNextLayer(d, pack, d.x - d.r, d.y - d.r);
+
+  var t = recalculateLayers(d, i);
+
+  if(dataToDelete.circles && dataToDelete.labels) {
+    t.each('end', function() {
+      dataToDelete.circles.each(function() { this.remove(); });
+      dataToDelete.labels.each(function() { this.remove(); });
+    });
+  }
+
+  node = d;
+  d3.event.stopPropagation();
+}
+
+function recalculateLayers(d, i) {
+  var k = r / d.r / 2;
+  x.domain([d.x - d.r, d.x + d.r]);
+  y.domain([d.y - d.r, d.y + d.r]);
+
+  var t = vis.transition()
+      .duration(d3.event.altKey ? 7500 : 750);
+
+  t.selectAll("circle")
+      .attr("cx", function(d) { return x(d.x); })
+      .attr("cy", function(d) { return y(d.y); })
+      .attr("r", function(d) { return k * d.r; });
+
+  t.selectAll("text")
+      .attr("x", function(d) { return x(d.x); })
+      .attr("y", function(d) { return y(d.y); })
+      .style("opacity", function(d) { return k * d.r > 20 ? 1 : 0; });
+
+  return t;
+}
+
+function showNextLayers(data, layerCount) {
+  if(data) {
+    data.children = data.$$children;
+    if(layerCount - 1 > 0 && data.children && data.children.length) {
+      for(var i = 0; i < data.children.length; i++) {
+        showNextLayers(data.children[i], layerCount - 1);
+      }
+    }
+  }
+}
+
+function hideAllBelow(data, layerIndex) {
+  var layers = [];
+
+  (function traverseAndHide(data, layerIndex) {
+    if(data) {
+      if(data.children && data.children.length) {
+        for(var i = 0; i < data.children.length; i++) {
+          traverseAndHide(data.children[i], layerIndex);
+        }
+      }
+
+      if(data.$$layer > layerIndex && layers.indexOf(data.$$layer) < 0) {
+        layers.push(data.$$layer);
+      }
+
+      if(data.children && data.$$layer >= layerIndex) {
+        delete data.children;
+      }
+    }
+  })(data,layerIndex);
+
+  return {
+    circles: vis.selectAll("circle")
+      .filter(function(d) { return layers.indexOf(d.$$layer) >= 0; }),
+    labels: vis.selectAll("text")
+      .filter(function(d) { return layers.indexOf(d.$$layer) >= 0; })
+  };
+}
+
+function prepareData(data) {
+  var uniqueIndex = 0;
+  
+  function prepareDataInternal(data, layerIndex) {
+    data.$$layer = layerIndex;
+    data.$$uniqueId = uniqueIndex++;
+    data.size = data.size || 0;
+
+    if(data.children && data.children.length) {
+      data.$$children = [];
+      for(var i = 0; i < data.children.length; i++) {
+        var dataItem = prepareDataInternal(data.children[i], layerIndex + 1);
+        data.$$children.push(dataItem);
+        data.size += dataItem.size;
+      }
+    }
+    data.hasChildren = (data.$$children && !!data.$$children.length) || false;
+    delete data.children;
+    return data;
+  }
+
+  return prepareDataInternal(data, 0);;
+}
+    </script>
+  </body>
+</html>
