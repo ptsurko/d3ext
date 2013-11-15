@@ -25,22 +25,26 @@
     </div>
 
     <script src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.3.9/d3.js"></script>
-    <script src="http://codeorigin.jquery.com/jquery-1.10.2.min.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <script src="js/tree.jquery.js"></script>
     <script type="text/javascript">
 
 var w = 740,
     h = 740,
     r = 720,
-    x = d3.scale.linear().range([0, r]),
-    y = d3.scale.linear().range([0, r]),
+    xScale = d3.scale.linear()
+          .range([0, r])
+          .domain([0, r]),
+    yScale = d3.scale.linear()
+          .range([0, r])
+          .domain([0, r]),
     node,
     root,
     layers = 3;
 
 var pack = d3.layout.pack()
     .size([r, r])
-    .value(function(d) { return d.size; })
+    .value(function(d) { return d.$$size; })
 
 var vis = d3.select("#circlepack").insert("svg:svg", "h2")
     .attr("width", w)
@@ -50,16 +54,35 @@ var vis = d3.select("#circlepack").insert("svg:svg", "h2")
 
 d3.json("flare.json", function(data) {
 
+  markUniqueElements(data);
+
   $('#tree1').tree({
     data: [data]
   });
+  
+  $('#tree1').bind('tree.select', function(e) {
+    var circleToZoom = findCircle(root, e.node.$$uniqueId);
+    var parents = markAllHiddenAscendingCirclesAsVisible(circleToZoom);
+
+    if(parents) {
+      for(var i = 0; i < parents.length; i++) {
+        var pack = d3.layout.pack()
+          .size([parents[i].r * 2, parents[i].r * 2])
+          .value(function(d) { return d.$$size; })
+
+        showNextLayer(parents[i], pack, parents[i].x - parents[i].r, parents[i].y - parents[i].r);
+      }
+    }
+    zoomToCircle(circleToZoom);
+  });
   node = root = prepareData(data);
+  
+  markLayersAsVisible(root, 1);
+
   showNextLayer(root, pack, 0, 0);
 });
 
 function showNextLayer(currentLayer, pack, offsetX, offsetY) {
-  showNextLayers(currentLayer, 1);
-
   var nodes;
   if(currentLayer.$$layer != 0) {
     nodes = packFromExistingLayer(currentLayer, pack, offsetX, offsetY);
@@ -71,29 +94,28 @@ function showNextLayer(currentLayer, pack, offsetX, offsetY) {
       .data(nodes, function(d) { return d.$$uniqueId; })
     .enter().append("svg:circle")
       .attr("class", function(d) { return d.hasChildren ? "parent" : "child"; })
-      .attr("cx", function(d) { return d.x; })
-      .attr("cy", function(d) { return d.y; })
+      .attr("cx", function(d) { return xScale(d.x); })
+      .attr("cy", function(d) { return yScale(d.y); })
       .attr("r", function(d) { return d.r; })
       .on("click", function(d) {
-        if(!d.hasChildren) {
-          d3.event.stopPropagation();
-        } else {
-          return zoom(node == d ? root : d);
-        }
+        //if(d.hasChildren) {
+          zoomToCircle(node == d ? root : d);
+        //}
+        d3.event.stopPropagation();
       });
 
   vis.selectAll("text")
       .data(nodes, function(d) { return d.$$uniqueId; })
     .enter().append("svg:text")
       .attr("class", function(d) { return d.hasChildren ? "parent" : "child"; })
-      .attr("x", function(d) { return d.x; })
-      .attr("y", function(d) { return d.y; })
+      .attr("x", function(d) { return xScale(d.x); })
+      .attr("y", function(d) { return yScale(d.y); })
       .attr("dy", ".35em")
       .attr("text-anchor", "middle")
       .style("opacity", function(d) { return d.r > 20 ? 1 : 0; })
       .text(function(d) { return d.label; });
 
-  d3.select(window).on("click", function() { zoom(root); });
+  //d3.select(window).on("click", function() { zoomToCircle(root); });
 }
 
 function packFromExistingLayer(currentLayer, pack, offsetX, offsetY) {
@@ -117,16 +139,17 @@ function packFromExistingLayer(currentLayer, pack, offsetX, offsetY) {
   return nodes;
 }
 
-function zoom(d, i) {
+function zoomToCircle(circle) {
   var pack = d3.layout.pack()
-    .size([d.r * 2, d.r * 2])
-    .value(function(d) { return d.size; })
+    .size([circle.r * 2, circle.r * 2])
+    .value(function(d) { return d.$$size; })
 
-  var dataToDelete = hideAllBelow(root, d.$$layer + 1);
+  var dataToDelete = hideAllBelow(root, circle.$$layer + 1);
 
-  showNextLayer(d, pack, d.x - d.r, d.y - d.r);
+  markLayersAsVisible(circle, 1);
+  showNextLayer(circle, pack, circle.x - circle.r, circle.y - circle.r);
 
-  var t = recalculateLayers(d, i);
+  var t = recalculateCircles(circle);
 
   if(dataToDelete.circles && dataToDelete.labels) {
     t.each('end', function() {
@@ -135,44 +158,75 @@ function zoom(d, i) {
     });
   }
 
-  node = d;
-  d3.event.stopPropagation();
+  node = circle;
 }
 
-function recalculateLayers(d, i) {
-  var k = r / d.r / 2;
-  x.domain([d.x - d.r, d.x + d.r]);
-  y.domain([d.y - d.r, d.y + d.r]);
+function recalculateCircles(circle) {
+  var k = r / circle.r / 2;
+  xScale.domain([circle.x - circle.r, circle.x + circle.r]);
+  yScale.domain([circle.y - circle.r, circle.y + circle.r]);
 
-  var t = vis.transition()
-      .duration(d3.event.altKey ? 7500 : 750);
+  var transition = vis.transition()
+        .duration(750)
 
-  t.selectAll("circle")
-      .attr("cx", function(d) { return x(d.x); })
-      .attr("cy", function(d) { return y(d.y); })
+  transition.selectAll("circle")
+      .attr("cx", function(d) { return xScale(d.x); })
+      .attr("cy", function(d) { return yScale(d.y); })
       .attr("r", function(d) { return k * d.r; });
 
-  t.selectAll("text")
-      .attr("x", function(d) { return x(d.x); })
-      .attr("y", function(d) { return y(d.y); })
+  transition.selectAll("text")
+      .attr("x", function(d) { return xScale(d.x); })
+      .attr("y", function(d) { return yScale(d.y); })
       .style("opacity", function(d) { return k * d.r > 20 ? 1 : 0; });
 
-  return t;
+  return transition;
 }
 
-function showNextLayers(data, layerCount) {
-  if(data) {
-    data.children = data.$$children;
-    if(layerCount - 1 > 0 && data.children && data.children.length) {
-      for(var i = 0; i < data.children.length; i++) {
-        showNextLayers(data.children[i], layerCount - 1);
+function markLayersAsVisible(circle, layerCount) {
+  if(circle) {
+    circle.children = circle.$$children;
+    if(layerCount - 1 > 0 && circle.children && circle.children.length) {
+      for(var i = 0; i < circle.children.length; i++) {
+        markLayersAsVisible(circle.children[i], layerCount - 1);
       }
     }
   }
 }
 
+
+function findCircle(data, circleId) {
+  if(data.$$uniqueId == circleId) {
+    return data;
+  }
+
+  if(data.$$children && data.$$children.length) {
+    var res;
+    for(var i = 0; i < data.$$children.length; i++) {
+      if((res = findCircle(data.$$children[i], circleId))) {
+        return res;
+      }
+    }
+  }
+}
+
+function markAllHiddenAscendingCirclesAsVisible(circle) {
+  var circles = [];
+  var current = circle.$$parent;
+
+  while(current != null && !current.children) {
+    if(current.$$children && current.$$children.length) {
+      current.children = current.$$children;
+    }
+    circles.push(current);
+
+    current = current.$$parent;
+  }
+
+  return circles.reverse();
+}
+
 function hideAllBelow(data, layerIndex) {
-  var layers = [];
+  var layersToHide = [];
 
   (function traverseAndHide(data, layerIndex) {
     if(data) {
@@ -182,8 +236,8 @@ function hideAllBelow(data, layerIndex) {
         }
       }
 
-      if(data.$$layer > layerIndex && layers.indexOf(data.$$layer) < 0) {
-        layers.push(data.$$layer);
+      if(data.$$layer > layerIndex && layersToHide.indexOf(data.$$layer) < 0) {
+        layersToHide.push(data.$$layer);
       }
 
       if(data.children && data.$$layer >= layerIndex) {
@@ -194,34 +248,39 @@ function hideAllBelow(data, layerIndex) {
 
   return {
     circles: vis.selectAll("circle")
-      .filter(function(d) { return layers.indexOf(d.$$layer) >= 0; }),
+      .filter(function(d) { return layersToHide.indexOf(d.$$layer) >= 0; }),
     labels: vis.selectAll("text")
-      .filter(function(d) { return layers.indexOf(d.$$layer) >= 0; })
+      .filter(function(d) { return layersToHide.indexOf(d.$$layer) >= 0; })
   };
 }
 
-function prepareData(data) {
-  var uniqueIndex = 0;
-  
-  function prepareDataInternal(data, layerIndex) {
-    data.$$layer = layerIndex;
-    data.$$uniqueId = uniqueIndex++;
-    data.size = data.size || 0;
 
-    if(data.children && data.children.length) {
-      data.$$children = [];
-      for(var i = 0; i < data.children.length; i++) {
-        var dataItem = prepareDataInternal(data.children[i], layerIndex + 1);
-        data.$$children.push(dataItem);
-        data.size += dataItem.size;
-      }
+
+var uniqueIndex = 0;
+function markUniqueElements(data) {
+  data.$$uniqueId = uniqueIndex++;
+  if(data.children && data.children.length) {
+    for(var i = 0; i < data.children.length; i++) {
+      markUniqueElements(data.children[i]);
     }
-    data.hasChildren = (data.$$children && !!data.$$children.length) || false;
-    delete data.children;
-    return data;
   }
+}
 
-  return prepareDataInternal(data, 0);;
+function prepareData(circle, layerIndex, parent) {
+  circle.$$layer = layerIndex || 0;
+  circle.$$size = circle.size || 0;
+  circle.$$parent = parent;
+  if(circle.children && circle.children.length) {
+    circle.$$children = [];
+    for(var i = 0; i < circle.children.length; i++) {
+      var dataItem = prepareData(circle.children[i], circle.$$layer + 1, circle);
+      circle.$$children.push(dataItem);
+      circle.$$size += dataItem.$$size;
+    }
+  }
+  circle.hasChildren = (circle.$$children && !!circle.$$children.length) || false;
+  delete circle.children;
+  return circle;
 }
     </script>
   </body>
