@@ -121,11 +121,11 @@ circle.parent {
   stroke: steelblue;
 }
 
-circle.parent:hover {
+circle.parent:hover, circle.child:hover {
   stroke: #ff7f0e;
   stroke-width: .5px;
 }
 
-circle.child {
-  /*pointer-events: none;*/
+* {
+  box-sizing: border-box;
 }

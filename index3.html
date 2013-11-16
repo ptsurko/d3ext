@@ -98,9 +98,7 @@ function showNextLayer(currentLayer, pack, offsetX, offsetY) {
       .attr("cy", function(d) { return yScale(d.y); })
       .attr("r", function(d) { return d.r; })
       .on("click", function(d) {
-        //if(d.hasChildren) {
-          zoomToCircle(node == d ? root : d);
-        //}
+        zoomToCircle(node == d ? root : d);
         d3.event.stopPropagation();
       });
 
@@ -114,8 +112,6 @@ function showNextLayer(currentLayer, pack, offsetX, offsetY) {
       .attr("text-anchor", "middle")
       .style("opacity", function(d) { return d.r > 20 ? 1 : 0; })
       .text(function(d) { return d.label; });
-
-  //d3.select(window).on("click", function() { zoomToCircle(root); });
 }
 
 function packFromExistingLayer(currentLayer, pack, offsetX, offsetY) {
@@ -142,7 +138,7 @@ function packFromExistingLayer(currentLayer, pack, offsetX, offsetY) {
 function zoomToCircle(circle) {
   var pack = d3.layout.pack()
     .size([circle.r * 2, circle.r * 2])
-    .value(function(d) { return d.$$size; })
+    .value(function(d) { return d.$$size; });
 
   var dataToDelete = hideAllBelow(root, circle.$$layer + 1);
 
@@ -218,7 +214,6 @@ function markAllHiddenAscendingCirclesAsVisible(circle) {
       current.children = current.$$children;
     }
     circles.push(current);
-
     current = current.$$parent;
   }
 
@@ -253,7 +248,6 @@ function hideAllBelow(data, layerIndex) {
       .filter(function(d) { return layersToHide.indexOf(d.$$layer) >= 0; })
   };
 }
-
 
 
 var uniqueIndex = 0;
