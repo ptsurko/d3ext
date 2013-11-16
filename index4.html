@@ -68,6 +68,13 @@ d3.json("flare.json", function(data) {
         if(current == selected && selected.parent != null) {
           selected = selected.parent;
         }
+        if(current == selected.parent && selected.parent.children.length == 1) {
+          selected = selected.parent;
+          while(selected != root && selected != null && selected.children.length == 1) {
+            selected = selected.parent;
+          }
+        }
+
         zoom(selected);
 
         var node = findCircle($('#tree1').tree('getTree').children[0], selected.$$uniqueId);
@@ -126,7 +133,7 @@ function rerenderCircles(selection, parents, k) {
   selection.selectAll("text")
       .attr("x", function(d) { return x(d.x); })
       .attr("y", function(d) { return y(d.y); })
-      .style("opacity", function(d) { return (parents.indexOf(d.parent) >= 0 || d.parent == null) && k * d.r > 20  ? 1 : 0; });
+      .style("opacity", function(d) { return (parents.indexOf(d.parent) >= 0 || d.parent == null) && k * d.r > 20  && d.depth >= current.depth ? 1 : 0; });
 }
 
 function getParents(node) {
