@@ -3,6 +3,9 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
     <link type="text/css" rel="stylesheet" href="css/sequences.css"/>
+    <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css">
+    <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
+    <script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
     <script src="http://cdnjs.cloudflare.com/ajax/libs/d3/3.3.9/d3.js"></script>    
     <script src="http://mbostock.github.io/d3/talk/20111116/d3/d3.csv.js"></script>
   </head>
@@ -17,8 +20,7 @@
       </div>
     </div>
     <div id="sidebar">
-      <input type="checkbox" id="togglelegend"> Legend<br/>
-      <div id="legend" style="visibility: hidden;"></div>
+      <ul id="legend"></ul>
     </div>
     <script type="text/javascript">
       // Dimensions of sunburst.
@@ -42,17 +44,15 @@ var colors = {
 };
 
 var levels = [{
-  key:1, value:'#5687d1', checked: true
+  id: 0, label: 'Prod Status', color:'#5687d1', checked: true, categories: []
 }, {
-  key:2, value:'#7b615c', checked: true
+  id: 1, label: 'Is Billable', color:'#7b615c', checked: true, categories: []
 }, {
-  key:3, value:'#de783b', checked: true
+  id: 2, label: 'Country', color:'#de783b', checked: true, categories: []
 }, {
-  key:4, value:'#6ab975', checked: true
+  id: 3, label: 'Bench Bucket', color:'#6ab975', checked: true, categories: []
 }, {
-  key:5, value:'#a173d1', checked: true
-}, {
-  key:6, value:'#bbbbbb', checked: true
+  id: 4, label: 'Cempetency', color:'#a173d1', checked: true, categories: []
 }];
 
 // Total size of all segments; we set this later, after loading the data.
@@ -76,11 +76,12 @@ var arc = d3.svg.arc()
     .outerRadius(function(d) { return Math.sqrt(d.y + d.dy); });
 
 var json;
-// Use d3.text and d3.csv.parseRows so that we do not need to have a header
-// row, and can receive the csv as an array of arrays.
-d3.text("visit-sequences.csv", function(text) {
-  var csv = d3.csv.parseRows(text);
-  json = buildHierarchy(csv);
+d3.json("flare.json", function(data) {
+  json = data;
+
+  markUniqueElements(json);
+
+  extractLevelCategories(json.children, 0);
 
   createVisualization(rebuildData(json));
 });
@@ -91,7 +92,6 @@ function createVisualization(json) {
   // Basic setup of page elements.
   initializeBreadcrumbTrail();
   drawLegend();
-  d3.select("#togglelegend").on("click", toggleLegend);
 
   // Bounding circle underneath the sunburst, to make it easier to detect
   // when the mouse leaves the parent g.
@@ -116,21 +116,29 @@ function createVisualization(json) {
       .data(nodes, function(d) { return d.$$id; });
 
       path.enter().append("svg:path")
-      .attr("display", function(d) { return d.depth ? null : "none"; })
-      .attr("d", arc)
-      .attr("fill-rule", "evenodd")
-      .style("fill", function(d) { return colors[d.name]; })
-      .style("opacity", 1)
-      .on("mouseover", mouseover);
+        .attr("display", function(d) { return d.depth ? null : "none"; })
+        .attr("d", arc)
+        .attr("fill-rule", "evenodd")
+        .style("fill", function(d) { return d.$$level < 0 ? '' : findLevelById(d.$$level).color; })
+        .style("opacity", 1)
+        .on("mouseover", mouseover);
 
       path.exit()
-      .remove();
+        .remove();
 
       path.attr("d", arc);
 
   // Get total size of the tree = value of root node from partition.
   totalSize = path.node().__data__.value;
  }
+
+function findLevelById(level) {
+  for(var i = 0; i < levels.length; i++) {
+    if(levels[i].id == level) {
+      return levels[i];
+    }
+  }
+}
 
 // Fade all but the current sequence, and show it in the breadcrumb trail.
 function mouseover(d) {
@@ -270,53 +278,58 @@ function updateBreadcrumbs(nodeArray, percentageString) {
 }
 
 function drawLegend() {
-
-  // Dimensions of legend item: width, height, spacing, radius of rounded rect.
-  var li = {
-    w: 75, h: 30, s: 3, r: 3
-  };
-
-  var legend = d3.select("#legend").append("svg:svg")
-      .attr("width", li.w)
-      .attr("height", d3.keys(colors).length * (li.h + li.s));
-  
-  var g = legend.selectAll("g")
+  var g = d3.select("#legend").selectAll("li")
       .data(levels)
-      .enter().append("svg:g")
-      .attr("transform", function(d, i) {
-              return "translate(0," + i * (li.h + li.s) + ")";
-           });
+      .enter()
+        .append("li")
+        .style("background", function(d) { return d.color; })
+        .style("cursor", "pointer")
+        .text(function(d) { return d.label; })
+        .each(function(d) { $(this).data('level', d.id); })
+        .on('click', function(d) {
+          d.checked = !(d.checked == null || d.checked);
+          d3.select(this).style('opacity', d.checked ? 1 : 0.3);
 
-  g.append("svg:rect")
-      .attr("rx", li.r)
-      .attr("ry", li.r)
-      .attr("width", li.w)
-      .attr("height", li.h)
-      .style("fill", function(d) { return d.value; })
-      .style("cursor", "pointer")
-      .on('click', function(d) {
-        d.checked = !(d.checked == null || d.checked);
-        d3.select(this).style('opacity', d.checked ? 1 : 0.3);
-        d3.select(this.nextElementSibling).style('opacity', d.checked ? 1 : 0.3);
+          drawVisualization(rebuildData(json));
+        });
 
-        drawVisualization(rebuildData(json));
+  $("#legend").sortable({
+    update: function(event, ui) {
+      var sortedLevels = [];
+      $('#legend li').each(function() {
+        var levelId = parseInt($(this).data('level'));
+        sortedLevels.push(findLevelById(levelId));
       });
+      levels = sortedLevels;
 
-  g.append("svg:text")
-      .attr("x", li.w / 2)
-      .attr("y", li.h / 2)
-      .attr("dy", "0.35em")
-      .attr("text-anchor", "middle")
-      .style("cursor", "pointer")
-      .text(function(d) { return d.key; })
-      .on('click', function(d) {
-        d.checked = !(d.checked == null || d.checked);
-        d3.select(this.previousElementSibling).style('opacity', d.checked ? 1 : 0.3);
+      //uniqueIndex = 0;
+      var json = {"name": "root"};
 
-        drawVisualization(rebuildData(json));
-      });
+      generateNewTree(json, 0);
+
+      markUniqueElements(json);
+
+      createVisualization(rebuildData(json));
+    }
+  });
 }
 
+
+function generateNewTree(parent, depth) {
+  parent.children = [];
+  for(var i = 0; i < levels[depth].categories.length; i++) {
+      var item = {"name": levels[depth].categories[i]};
+      
+      if(depth < levels.length - 1 && Math.random() > depth / 5) {
+        generateNewTree(item, depth + 1);
+      }
+      if(!item.children || !item.children.length) {
+        item.size = Math.floor(Math.random() * 5000);
+      }
+
+      parent.children.push(item);    
+  }
+}
 
 function rebuildData(json) {
   var cloned = clone(json);
@@ -365,92 +378,65 @@ function calculateSize(json) {
   return json.size;
 }
 
-function toggleLegend() {
-  var legend = d3.select("#legend");
-  if (legend.style("visibility") == "hidden") {
-    legend.style("visibility", "");
-  } else {
-    legend.style("visibility", "hidden");
+var uniqueIndex = 0;
+function markUniqueElements(data, depth) {
+  data.$$id = uniqueIndex++;
+  data.$$level = depth == undefined ? -1 : levels[depth].id;
+  if(data.children && data.children.length) {
+    for(var i = 0; i < data.children.length; i++) {
+      markUniqueElements(data.children[i], depth == undefined ? 0 : depth + 1);
+    }
   }
+  return data;
 }
-
-// Take a 2-column CSV and transform it into a hierarchical structure suitable
-// for a partition layout. The first column is a sequence of step names, from
-// root to leaf, separated by hyphens. The second column is a count of how 
-// often that sequence occurred.
-function buildHierarchy(csv) {
-  var root = {"name": "root", "children": []};
-  var id = 0;
-  for (var i = 0; i < csv.length; i++) {
-    var sequence = csv[i][0];
-    var size = +csv[i][1];
-    if (isNaN(size)) { // e.g. if this is a header row
-      continue;
-    }
-    var parts = sequence.split("-");
-    var currentNode = root;
-    for (var j = 0; j < parts.length; j++) {
-      var children = currentNode["children"];
-      var nodeName = parts[j];
-      var childNode;
-      if (j + 1 < parts.length) {
-   // Not yet at the end of the sequence; move down the tree.
- 	var foundChild = false;
- 	for (var k = 0; k < children.length; k++) {
- 	  if (children[k]["name"] == nodeName) {
- 	    childNode = children[k];
- 	    foundChild = true;
- 	    break;
- 	  }
- 	}
-  // If we don't already have a child node for this branch, create it.
- 	if (!foundChild) {
- 	  childNode = {"name": nodeName, "children": [], $$id: id++};
- 	  children.push(childNode);
- 	}
- 	currentNode = childNode;
-      } else {
- 	// Reached the end of the sequence; create a leaf node.
- 	childNode = {"name": nodeName, "size": size, $$id: id++};
- 	children.push(childNode);
-      }
-    }
-  }
-  return root;
-};
 
 
 function clone(obj) {
-    // Handle the 3 simple types, and null or undefined
-    if (null == obj || "object" != typeof obj) return obj;
+  // Handle the 3 simple types, and null or undefined
+  if (null == obj || "object" != typeof obj) return obj;
 
-    // Handle Date
-    if (obj instanceof Date) {
-        var copy = new Date();
-        copy.setTime(obj.getTime());
-        return copy;
-    }
+  // Handle Date
+  if (obj instanceof Date) {
+      var copy = new Date();
+      copy.setTime(obj.getTime());
+      return copy;
+  }
 
-    // Handle Array
-    if (obj instanceof Array) {
-        var copy = [];
-        for (var i = 0, len = obj.length; i < len; i++) {
-            copy[i] = clone(obj[i]);
-        }
-        return copy;
-    }
+  // Handle Array
+  if (obj instanceof Array) {
+      var copy = [];
+      for (var i = 0, len = obj.length; i < len; i++) {
+          copy[i] = clone(obj[i]);
+      }
+      return copy;
+  }
 
-    // Handle Object
-    if (obj instanceof Object) {
-        var copy = {};
-        for (var attr in obj) {
-            if (obj.hasOwnProperty(attr)) copy[attr] = clone(obj[attr]);
-        }
-        return copy;
-    }
+  // Handle Object
+  if (obj instanceof Object) {
+      var copy = {};
+      for (var attr in obj) {
+          if (obj.hasOwnProperty(attr)) copy[attr] = clone(obj[attr]);
+      }
+      return copy;
+  }
 
-    throw new Error("Unable to copy obj! Its type isn't supported.");
+  throw new Error("Unable to copy obj! Its type isn't supported.");
 }
+
+function extractLevelCategories(items, level) {
+  if(items != null && items.length) {
+    for(var i = 0; i < items.length; i++) {
+      if(levels[level].categories.indexOf(items[i].name) < 0) {
+        levels[level].categories.push(items[i].name);
+
+        if(items[i].children && items[i].children.length) {
+          extractLevelCategories(items[i].children, level + 1);
+        }
+      }
+    }
+  }
+}
+
   </script> 
   </body>
 </html>

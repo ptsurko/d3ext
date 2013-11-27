@@ -27,6 +27,16 @@ body {
   padding: 10px 0 0 3px;
 }
 
+#legend li {
+  border-radius: 3px;
+  color: white;
+  list-style: none;
+  margin: 1px;
+  padding: 7px 15px;
+  width: 100px;
+  text-align: center;
+}
+
 #sequence text, #legend text {
   font-weight: 600;
   fill: #fff;
