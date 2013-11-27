@@ -287,9 +287,10 @@ function drawLegend() {
         .text(function(d) { return d.label; })
         .each(function(d) { $(this).data('level', d.id); })
         .on('click', function(d) {
+          debugger
           d.checked = !(d.checked == null || d.checked);
           d3.select(this).style('opacity', d.checked ? 1 : 0.3);
-
+debugger
           drawVisualization(rebuildData(json));
         });
 
@@ -302,8 +303,7 @@ function drawLegend() {
       });
       levels = sortedLevels;
 
-      //uniqueIndex = 0;
-      var json = {"name": "root"};
+      json = {"name": "root"};
 
       generateNewTree(json, 0);
 
