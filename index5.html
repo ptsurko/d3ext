@@ -14,8 +14,8 @@
       <div id="sequence"></div>
       <div id="chart">
         <div id="explanation" style="visibility: hidden;">
+          <span id="amount"></span><br/>
           <span id="percentage"></span><br/>
-          of visits begin with this sequence of pages
         </div>
       </div>
     </div>
@@ -149,6 +149,8 @@ function mouseover(d) {
     percentageString = "< 0.1%";
   }
 
+  d3.select("#amount")
+      .text(d.value);
   d3.select("#percentage")
       .text(percentageString);
 
@@ -323,7 +325,7 @@ function generateNewTree(parent, depth) {
         generateNewTree(item, depth + 1);
       }
       if(!item.children || !item.children.length) {
-        item.size = Math.floor(Math.random() * 5000);
+        item.size = Math.floor(Math.random() * 50);
       }
 
       parent.children.push(item);    
