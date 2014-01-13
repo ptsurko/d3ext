@@ -279,7 +279,7 @@ function updateBreadcrumbs(nodeArray, percentageString) {
 
 function drawLegend() {
   var g = d3.select("#legend").selectAll("li")
-      .data(levels)
+      .data(cloneReverse(levels))
       .enter()
         .append("li")
         .style("background", function(d) { return d.color; })
@@ -287,10 +287,8 @@ function drawLegend() {
         .text(function(d) { return d.label; })
         .each(function(d) { $(this).data('level', d.id); })
         .on('click', function(d) {
-          debugger
           d.checked = !(d.checked == null || d.checked);
           d3.select(this).style('opacity', d.checked ? 1 : 0.3);
-debugger
           drawVisualization(rebuildData(json));
         });
 
@@ -301,7 +299,8 @@ debugger
         var levelId = parseInt($(this).data('level'));
         sortedLevels.push(findLevelById(levelId));
       });
-      levels = sortedLevels;
+
+      levels = cloneReverse(sortedLevels);
 
       json = {"name": "root"};
 
@@ -421,6 +420,14 @@ function clone(obj) {
   }
 
   throw new Error("Unable to copy obj! Its type isn't supported.");
+}
+
+function cloneReverse(array) {
+  var newArray = [];
+  for(var i = 0; i < array.length; i++) {
+    newArray.splice(0, 0, array[i]);
+  }
+  return newArray;
 }
 
 function extractLevelCategories(items, level) {
